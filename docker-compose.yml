@@ -1,0 +1,92 @@
+name: self-host
+
+services:
+  traefik:
+    image: traefik
+    container_name: traefik
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik/traefik.yml:/etc/traefik/traefik.yml:ro"
+      - "./traefik/config/conf/:/etc/traefik/conf/"
+      - "./traefik/config/certs/:/etc/traefik/certs/"
+    command: --providers.docker --log.level=DEBUG
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - "minio-data:/data"
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+      MINIO_SERVER_ADDRESS: 0.0.0.0:9000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.minio.entrypoints=web"
+      - "traefik.http.routers.minio.rule=Host(`minio.localhost`)"
+      - "traefik.http.services.minio.loadbalancer.server.port=9000"
+
+  registry:
+    image: registry:2
+    container_name: registry
+    ports:
+      - "5000:5000"
+    volumes:
+      - "registry-data:/var/lib/registry"
+      - "./registry/auth/htpasswd:/auth/htpasswd:ro"
+    restart: always
+    environment:
+      REGISTRY_HTTP_ADDR: 0.0.0.0:5000
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: "Registry Realm"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.registry.entrypoints=web"
+      - "traefik.http.routers.registry.rule=Host(`registry.localhost`)"
+      - "traefik.http.services.registry.loadbalancer.server.port=5000"
+
+  trivy:
+    image: aquasec/trivy
+    container_name: trivy
+    ports:
+      - "6060:6060"
+    volumes:
+      - "trivy-data:/etc/trivy"
+      - "./trivy/cache:/root/.cache"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    restart: always
+    command: server --listen :4954
+    environment:
+      TRIVY_LOG: DEBUG
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.trivy.entrypoints=web"
+      - "traefik.http.routers.trivy.rule=Host(`trivy.localhost`)"
+      - "traefik.http.services.trivy.loadbalancer.server.port=4954"
+networks:
+  default:
+    driver: bridge
+
+volumes:
+  minio-data:
+    driver: local
+  registry-data:
+    driver: local
+  trivy-data:
+    driver: local

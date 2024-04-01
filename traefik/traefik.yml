@@ -1,0 +1,23 @@
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+entryPoints:
+  web:
+    address: :80
+
+api:
+  dashboard: true
+  insecure: true
+
+providers:
+  docker:
+    exposedByDefault: false
+  file:
+    directory: ./conf/
+    watch: true
+
+log:
+  level: DEBUG
+  filePath: /dev/stdout
+  format: json
