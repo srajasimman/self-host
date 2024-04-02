@@ -2,10 +2,6 @@ global:
   checkNewVersion: false
   sendAnonymousUsage: false
 
-entryPoints:
-  web:
-    address: :80
-
 api:
   dashboard: true
   insecure: true
@@ -16,6 +12,20 @@ providers:
   file:
     directory: ./conf/
     watch: true
+
+entryPoints:
+  web:
+    address: :80
+  websecure:
+    address: :443
+
+certificatesResolvers:
+  default:
+    acme:
+      email: ${EMAIL}
+      storage: acme.json
+      httpChallenge:
+        entryPoint: web
 
 log:
   level: DEBUG
