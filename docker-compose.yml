@@ -14,7 +14,7 @@ services:
       - "./traefik/config/conf/:/etc/traefik/conf/"
       - "./traefik/config/certs/:/etc/traefik/acme/"
     command: --providers.docker --log.level=DEBUG
-    restart: always
+    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.entrypoints=web"
@@ -38,7 +38,7 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./homepage/app/config/:/app/config/"
-    restart: always
+    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.homepage.entrypoints=web"
@@ -53,7 +53,7 @@ services:
       - "50000:50000"
     volumes:
       - "jenkins-data:/var/jenkins_home"
-    restart: always
+    restart: unless-stopped
     environment:
       JAVA_OPTS: -Djenkins.install.runSetupWizard=true
     labels:
@@ -75,7 +75,7 @@ services:
       - "9001:9001"
     volumes:
       - "minio-data:/data"
-    restart: always
+    restart: unless-stopped
     command: server /data --console-address "0.0.0.0:9001"
     environment:
       MINIO_DOMAIN: http://minio.${DOMAIN:-localhost}
@@ -100,7 +100,7 @@ services:
     volumes:
       - "registry-data:/var/lib/registry"
       - "./registry/auth/htpasswd:/auth/htpasswd:ro"
-    restart: always
+    restart: unless-stopped
     environment:
       REGISTRY_HTTP_ADDR: 0.0.0.0:5000
       REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
@@ -127,7 +127,7 @@ services:
       - "trivy-data:/etc/trivy"
       - "trivy-cache:/root/.cache"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-    restart: always
+    restart: unless-stopped
     command: server --listen :4954
     environment:
       TRIVY_LOG: DEBUG
@@ -178,6 +178,83 @@ services:
       - postgresql:/var/lib/postgresql
       - postgresql_data:/var/lib/postgresql/data
 
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9090"
+    volumes:
+      - "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "prometheus-data:/prometheus"
+    command: --config.file /etc/prometheus/prometheus.yml
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.entrypoints=web"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Prometheus"
+      - "homepage.icon=prometheus.png"
+      - "homepage.href=http://prometheus.${DOMAIN:-localhost}/"
+      - "homepage.description=Prometheus"
+      - "homepage.widget.type=prometheus"
+      - "homepage.widget.url=http://prometheus:9090"
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000"
+    volumes:
+      - "./grafana/provisioning:/etc/grafana/provisioning"
+      - "./grafana/dashboards:/etc/grafana/dashboards"
+      - "grafana-data:/var/lib/grafana"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.entrypoints=web"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Grafana"
+      - "homepage.icon=grafana.png"
+      - "homepage.href=http://grafana.${DOMAIN:-localhost}/"
+      - "homepage.description=Grafana"
+      - "homepage.widget.type=grafana"
+      - "homepage.widget.url=http://grafana:3000"
+      - "homepage.widget.username=admin"
+      - "homepage.widget.password=admin"
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor
+    container_name: cadvisor
+    ports:
+      - "8080"
+    volumes:
+      - "/:/rootfs:ro"
+      - "/var/run:/var/run:rw"
+      - "/sys:/sys:ro"
+      - "/var/lib/docker/:/var/lib/docker:ro"
+      - "/dev/disk/:/dev/disk:ro"
+    restart: unless-stopped
+
+  node_exporter:
+    image: prom/node-exporter
+    container_name: node_exporter
+    ports:
+      - "9100"
+    volumes:
+      - "/proc:/host/proc:ro"
+      - "/sys:/host/sys:ro"
+      - "/:/rootfs:ro"
+    command: ["--path.procfs=/host/proc", "--path.sysfs=/host/sys", "--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($|/)"]
+    restart: unless-stopped
+
 networks:
   default:
     driver: bridge
@@ -204,4 +281,8 @@ volumes:
   postgresql:
     driver: local
   postgresql_data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
     driver: local

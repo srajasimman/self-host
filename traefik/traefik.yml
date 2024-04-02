@@ -27,6 +27,12 @@ certificatesResolvers:
       httpChallenge:
         entryPoint: web
 
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    addRoutersLabels: true
+
 log:
   level: DEBUG
   filePath: /dev/stdout
