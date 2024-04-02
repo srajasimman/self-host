@@ -12,7 +12,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./traefik/traefik.yml:/etc/traefik/traefik.yml:ro"
       - "./traefik/config/conf/:/etc/traefik/conf/"
-      - "./traefik/config/acme/:/etc/traefik/acme/"
+      - "./traefik/config/certs/:/etc/traefik/acme/"
     command: --providers.docker --log.level=DEBUG
     restart: always
     labels:
@@ -25,6 +25,8 @@ services:
       - "homepage.icon=traefik.png"
       - "homepage.href=http://traefik.${DOMAIN:-localhost}/"
       - "homepage.description=Traefik Dashboard"
+      - "homepage.widget.type=traefik"
+      - "homepage.widget.url=http://traefik:8080"
 
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
