@@ -22,7 +22,7 @@ entryPoints:
 certificatesResolvers:
   default:
     acme:
-      email: ${ACME_EMAIL}
+      email: ${ACME_EMAIL:-noreply@localhost}
       storage: acme.json
       httpChallenge:
         entryPoint: web
