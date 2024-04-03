@@ -257,6 +257,13 @@ services:
     command: ["--path.procfs=/host/proc", "--path.sysfs=/host/sys", "--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($|/)"]
     restart: unless-stopped
 
+  blackbox_exporter:
+    image: prom/blackbox-exporter
+    container_name: blackbox_exporter
+    ports:
+      - "9115"
+    restart: unless-stopped
+
 networks:
   default:
     driver: bridge
