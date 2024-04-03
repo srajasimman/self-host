@@ -1,0 +1,23 @@
+---
+title: My Awesome Homepage
+headerStyle: boxed
+
+background: 
+  image: https://images.unsplash.com/photo-1637825891028-564f672aa42c
+  blur: xl
+  brightness: 90
+  opacity: 60
+
+cardBlur: sm
+
+providers:
+  openweathermap: openweathermapapikey
+  weatherapi: weatherapiapikey
+
+layout:
+  Infrastructure:
+    icon: mdi-server-#FFFFFF
+  Development:
+    icon: mdi-auto-fix-#FFFFFF
+  Monitoring:
+    icon: mdi-chart-#FFFFFF
