@@ -17,7 +17,7 @@ providers:
 layout:
   Infrastructure:
     icon: mdi-server-#FFFFFF
-  Development:
-    icon: mdi-auto-fix-#FFFFFF
   Monitoring:
-    icon: mdi-chart-#FFFFFF
+    icon: mdi-monitor-#FFFFFF
+  Development:
+    icon: mdi-developer-board-#FFFFFF
