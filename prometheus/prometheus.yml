@@ -26,10 +26,8 @@ scrape_configs:
       module: [http_2xx]
     static_configs:
       - targets:
-        - https://igotkarmayogi.gov.in
-        - https://portal.igotkarmayogi.gov.in
-        - https://karmayogibm.nic.in
-        - https://portal.karmayogibm.nic.in
+        - github.com
+        - hub.docker.com
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
