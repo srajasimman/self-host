@@ -28,6 +28,8 @@ scrape_configs:
       - targets:
         - https://igotkarmayogi.gov.in
         - https://portal.igotkarmayogi.gov.in
+        - https://karmayogibm.nic.in
+        - https://portal.karmayogibm.nic.in
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
