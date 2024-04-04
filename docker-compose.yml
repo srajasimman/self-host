@@ -157,6 +157,7 @@ services:
       - sonarqube_logs:/opt/sonarqube/logs
     ports:
       - "9000"
+    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.sonarqube.entrypoints=web"
@@ -177,6 +178,25 @@ services:
     volumes:
       - postgresql:/var/lib/postgresql
       - postgresql_data:/var/lib/postgresql/data
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    volumes:
+        - "uptime-kuma-data:/app/data"
+    ports:
+        - 3001:3001
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.uptime-kuma.entrypoints=web"
+      - "traefik.http.routers.uptime-kuma.rule=Host(`uptime-kuma.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.uptime-kuma.loadbalancer.server.port=3001"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Uptime Kuma"
+      - "homepage.icon=uptime-kuma.png"
+      - "homepage.href=http://uptime-kuma.${DOMAIN:-localhost}/"
+      - "homepage.description=Uptime Kuma"
 
   prometheus:
     image: prom/prometheus
@@ -291,6 +311,8 @@ volumes:
   sonarqube_logs:
     driver: local
   postgresql:
+    driver: local
+  uptime-kuma-data:
     driver: local
   postgresql_data:
     driver: local
