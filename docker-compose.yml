@@ -201,6 +201,50 @@ services:
       - "homepage.widget.url=http://uptime-kuma:3001"
       - "homepage.widget.slug=igotkarmayogi-gov-in"
 
+  uptimekuma-api:
+    image: medaziz11/uptimekuma_restapi
+    container_name: uptimekuma-api
+    volumes:
+      - uptimekuma-api-data:/db
+    ports:
+      - 8000:8000
+    restart: unless-stopped
+    environment:
+      - KUMA_SERVER=http://uptime-kuma:3001
+      - KUMA_USERNAME=admin
+      - KUMA_PASSWORD=Password@123
+      - ADMIN_PASSWORD=Password@123
+    depends_on:
+      - uptime-kuma
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.uptimekuma-api.entrypoints=web"
+      - "traefik.http.routers.uptimekuma-api.rule=Host(`uptimekuma-api.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.uptimekuma-api.loadbalancer.server.port=8000"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Uptime Kuma API"
+      - "homepage.icon=uptime-kuma.png"
+      - "homepage.href=http://uptimekuma-api.${DOMAIN:-localhost}/"
+      - "homepage.description=Uptime Kuma API"
+
+  mailhog:
+    image: mailhog/mailhog
+    container_name: mailhog
+    ports:
+      - "1025"
+      - "8025"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mailhog.entrypoints=web"
+      - "traefik.http.routers.mailhog.rule=Host(`mailhog.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.mailhog.loadbalancer.server.port=8025"
+      - "homepage.group=Infrastructure"
+      - "homepage.name=MailHog"
+      - "homepage.icon=mailhog.png"
+      - "homepage.href=http://mailhog.${DOMAIN:-localhost}/"
+      - "homepage.description=MailHog"
+
   prometheus:
     image: prom/prometheus
     container_name: prometheus
@@ -223,6 +267,26 @@ services:
       - "homepage.description=Prometheus"
       - "homepage.widget.type=prometheus"
       - "homepage.widget.url=http://prometheus:9090"
+
+  alertmanager:
+    image: prom/alertmanager
+    container_name: alertmanager
+    ports:
+      - "9093"
+    volumes:
+      - "./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro"
+    command: --config.file /etc/alertmanager/alertmanager.yml
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alertmanager.entrypoints=web"
+      - "traefik.http.routers.alertmanager.rule=Host(`alertmanager.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Alertmanager"
+      - "homepage.icon=alertmanager.png"
+      - "homepage.href=http://alertmanager.${DOMAIN:-localhost}/"
+      - "homepage.description=Alertmanager"
 
   grafana:
     image: grafana/grafana
@@ -315,11 +379,13 @@ volumes:
     driver: local
   postgresql:
     driver: local
-  uptime-kuma-data:
-    driver: local
   postgresql_data:
     driver: local
   prometheus-data:
     driver: local
   grafana-data:
+    driver: local
+  uptime-kuma-data:
+    driver: local
+  uptimekuma-api-data:
     driver: local

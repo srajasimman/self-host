@@ -15,9 +15,9 @@ providers:
   weatherapi: weatherapiapikey
 
 layout:
-  Infrastructure:
-    icon: mdi-server-#FFFFFF
   Monitoring:
     icon: mdi-monitor-#FFFFFF
+  Infrastructure:
+    icon: mdi-server-#FFFFFF
   Development:
     icon: mdi-developer-board-#FFFFFF
