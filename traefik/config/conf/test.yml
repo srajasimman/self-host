@@ -1,0 +1,12 @@
+http:
+  routers:
+    test:
+      rule: Host(`test.localhost`)
+      service: test
+      entryPoints:
+        - web
+  services:
+    test:
+      loadBalancer:
+        servers:
+          - url: http://10.10.10.10:8080
