@@ -1,5 +1,6 @@
-# Self-Hosting Boilerplate with Docker Compose
+![image](https://github.com/user-attachments/assets/030ec4cc-0a5a-43b2-b4e3-a210b76fb48f)
 
+# Self-Hosting Boilerplate with Docker Compose
 This repository provides a boilerplate for self-hosting various applications and services using Docker Compose. It includes a predefined `docker-compose.yml` file that simplifies the deployment of your services.
 
 ## Table of Contents
