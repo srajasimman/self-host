@@ -1,0 +1,39 @@
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+api:
+  dashboard: true
+  insecure: true
+
+providers:
+  docker:
+    exposedByDefault: false
+  file:
+    directory: /etc/traefik/conf/
+    watch: true
+
+entryPoints:
+  web:
+    address: :80
+  websecure:
+    address: :443
+
+certificatesResolvers:
+  default:
+    acme:
+      email: ${ACME_EMAIL:-noreply@localhost}
+      storage: acme.json
+      httpChallenge:
+        entryPoint: web
+
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    addRoutersLabels: true
+
+log:
+  level: DEBUG
+  filePath: /dev/stdout
+  format: json

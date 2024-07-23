@@ -1,0 +1,391 @@
+name: self-host
+
+services:
+  traefik:
+    image: traefik
+    container_name: traefik
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik/traefik.yml:/etc/traefik/traefik.yml:ro"
+      - "./traefik/config/conf/:/etc/traefik/conf/"
+      - "./traefik/config/certs/:/etc/traefik/acme/"
+    command: --providers.docker --log.level=DEBUG
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+      - "homepage.group=Infrastructure"
+      - "homepage.name=Traefik"
+      - "homepage.icon=traefik.png"
+      - "homepage.href=http://traefik.${DOMAIN:-localhost}/"
+      - "homepage.description=Traefik Dashboard"
+      - "homepage.widget.type=traefik"
+      - "homepage.widget.url=http://traefik:8080"
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    environment:
+      - LOG_LEVEL=info
+    ports:
+      - 3000:3000
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./homepage/app/config/:/app/config/"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homepage.entrypoints=web"
+      - "traefik.http.routers.homepage.rule=Host(`homepage.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.homepage.loadbalancer.server.port=3000"
+
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    ports:
+      - "8080"
+      - "50000:50000"
+    volumes:
+      - "jenkins-data:/var/jenkins_home"
+    restart: unless-stopped
+    environment:
+      JAVA_OPTS: -Djenkins.install.runSetupWizard=true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jenkins.entrypoints=web"
+      - "traefik.http.routers.jenkins.rule=Host(`jenkins.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.jenkins.loadbalancer.server.port=8080"
+      - "homepage.group=Development"
+      - "homepage.name=Jenkins"
+      - "homepage.icon=jenkins.png"
+      - "homepage.href=http://jenkins.${DOMAIN:-localhost}/"
+      - "homepage.description=Jenkins Continuous Integration Server"
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9000"
+      - "9001:9001"
+    volumes:
+      - "minio-data:/data"
+    restart: unless-stopped
+    command: server /data --console-address "0.0.0.0:9001"
+    environment:
+      MINIO_DOMAIN: http://minio.${DOMAIN:-localhost}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-password}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.minio.entrypoints=web"
+      - "traefik.http.routers.minio.rule=Host(`minio.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.minio.loadbalancer.server.port=9000"
+      - "homepage.group=Infrastructure"
+      - "homepage.name=Minio"
+      - "homepage.icon=minio.png"
+      - "homepage.href=http://minio.${DOMAIN:-localhost}/"
+      - "homepage.description=Minio Object Storage"
+
+  registry:
+    image: registry:2
+    container_name: registry
+    ports:
+      - "5000"
+    volumes:
+      - "registry-data:/var/lib/registry"
+      - "./registry/auth/htpasswd:/auth/htpasswd:ro"
+    restart: unless-stopped
+    environment:
+      REGISTRY_HTTP_ADDR: 0.0.0.0:5000
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: "Registry Realm"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.registry.entrypoints=web"
+      - "traefik.http.routers.registry.rule=Host(`registry.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.registry.loadbalancer.server.port=5000"
+      - "homepage.group=Infrastructure"
+      - "homepage.name=Docker Registry"
+      - "homepage.icon=docker.png"
+      - "homepage.href=http://registry.${DOMAIN:-localhost}/"
+      - "homepage.description=Docker Container Image Registry"
+
+  trivy:
+    image: aquasec/trivy
+    container_name: trivy
+    ports:
+      - "4594"
+    volumes:
+      - "trivy-data:/etc/trivy"
+      - "trivy-cache:/root/.cache"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    restart: unless-stopped
+    command: server --listen :4954
+    environment:
+      TRIVY_LOG: DEBUG
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.trivy.entrypoints=web"
+      - "traefik.http.routers.trivy.rule=Host(`trivy.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.trivy.loadbalancer.server.port=4954"
+      - "homepage.group=Development"
+      - "homepage.name=Trivy"
+      - "homepage.icon=trivy.png"
+      - "homepage.href=http://trivy.${DOMAIN:-localhost}/"
+      - "homepage.description=Vulnerability Scanner"
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: sonarqube
+    depends_on:
+      - postgres
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://postgres:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    ports:
+      - "9000"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sonarqube.entrypoints=web"
+      - "traefik.http.routers.sonarqube.rule=Host(`sonarqube.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.sonarqube.loadbalancer.server.port=9000"
+      - "homepage.group=Development"
+      - "homepage.name=SonarQube"
+      - "homepage.icon=sonarqube.png"
+      - "homepage.href=http://sonarqube.${DOMAIN:-localhost}/"
+      - "homepage.description=SonarQube"
+
+  postgres:
+    image: postgres:12
+    container_name: postgres
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+    volumes:
+      - postgresql:/var/lib/postgresql
+      - postgresql_data:/var/lib/postgresql/data
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    volumes:
+        - "uptime-kuma-data:/app/data"
+    ports:
+        - 3001:3001
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.uptime-kuma.entrypoints=web"
+      - "traefik.http.routers.uptime-kuma.rule=Host(`uptime-kuma.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.uptime-kuma.loadbalancer.server.port=3001"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Uptime Kuma"
+      - "homepage.icon=uptime-kuma.png"
+      - "homepage.href=http://uptime-kuma.${DOMAIN:-localhost}/"
+      - "homepage.description=Uptime Kuma"
+      - "homepage.widget.type=uptimekuma"
+      - "homepage.widget.url=http://uptime-kuma:3001"
+      - "homepage.widget.slug=igotkarmayogi-gov-in"
+
+  uptimekuma-api:
+    image: medaziz11/uptimekuma_restapi
+    container_name: uptimekuma-api
+    volumes:
+      - uptimekuma-api-data:/db
+    ports:
+      - 8000:8000
+    restart: unless-stopped
+    environment:
+      - KUMA_SERVER=http://uptime-kuma:3001
+      - KUMA_USERNAME=admin
+      - KUMA_PASSWORD=Password@123
+      - ADMIN_PASSWORD=Password@123
+    depends_on:
+      - uptime-kuma
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.uptimekuma-api.entrypoints=web"
+      - "traefik.http.routers.uptimekuma-api.rule=Host(`uptimekuma-api.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.uptimekuma-api.loadbalancer.server.port=8000"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Uptime Kuma API"
+      - "homepage.icon=uptime-kuma.png"
+      - "homepage.href=http://uptimekuma-api.${DOMAIN:-localhost}/"
+      - "homepage.description=Uptime Kuma API"
+
+  mailhog:
+    image: mailhog/mailhog
+    container_name: mailhog
+    ports:
+      - "1025"
+      - "8025"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mailhog.entrypoints=web"
+      - "traefik.http.routers.mailhog.rule=Host(`mailhog.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.mailhog.loadbalancer.server.port=8025"
+      - "homepage.group=Infrastructure"
+      - "homepage.name=MailHog"
+      - "homepage.icon=mailhog.png"
+      - "homepage.href=http://mailhog.${DOMAIN:-localhost}/"
+      - "homepage.description=MailHog"
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9090"
+    volumes:
+      - "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "prometheus-data:/prometheus"
+    command: --config.file /etc/prometheus/prometheus.yml
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.entrypoints=web"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Prometheus"
+      - "homepage.icon=prometheus.png"
+      - "homepage.href=http://prometheus.${DOMAIN:-localhost}/"
+      - "homepage.description=Prometheus"
+      - "homepage.widget.type=prometheus"
+      - "homepage.widget.url=http://prometheus:9090"
+
+  alertmanager:
+    image: prom/alertmanager
+    container_name: alertmanager
+    ports:
+      - "9093"
+    volumes:
+      - "./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro"
+    command: --config.file /etc/alertmanager/alertmanager.yml
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alertmanager.entrypoints=web"
+      - "traefik.http.routers.alertmanager.rule=Host(`alertmanager.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Alertmanager"
+      - "homepage.icon=alertmanager.png"
+      - "homepage.href=http://alertmanager.${DOMAIN:-localhost}/"
+      - "homepage.description=Alertmanager"
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000"
+    volumes:
+      - "./grafana/provisioning:/etc/grafana/provisioning"
+      - "./grafana/dashboards:/etc/grafana/dashboards"
+      - "grafana-data:/var/lib/grafana"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.entrypoints=web"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Grafana"
+      - "homepage.icon=grafana.png"
+      - "homepage.href=http://grafana.${DOMAIN:-localhost}/"
+      - "homepage.description=Grafana"
+      - "homepage.widget.type=grafana"
+      - "homepage.widget.url=http://grafana:3000"
+      - "homepage.widget.username=admin"
+      - "homepage.widget.password=admin"
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor
+    container_name: cadvisor
+    ports:
+      - "8080"
+    volumes:
+      - "/:/rootfs:ro"
+      - "/var/run:/var/run:rw"
+      - "/sys:/sys:ro"
+      - "/var/lib/docker/:/var/lib/docker:ro"
+      - "/dev/disk/:/dev/disk:ro"
+    restart: unless-stopped
+
+  node_exporter:
+    image: prom/node-exporter
+    container_name: node_exporter
+    ports:
+      - "9100"
+    volumes:
+      - "/proc:/host/proc:ro"
+      - "/sys:/host/sys:ro"
+      - "/:/rootfs:ro"
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($|/)"
+    restart: unless-stopped
+
+  blackbox_exporter:
+    image: prom/blackbox-exporter
+    container_name: blackbox_exporter
+    ports:
+      - "9115"
+    restart: unless-stopped
+
+networks:
+  default:
+    driver: bridge
+  sonarqube:
+    driver: bridge
+
+volumes:
+  jenkins-data:
+    driver: local
+  minio-data:
+    driver: local
+  registry-data:
+    driver: local
+  trivy-data:
+    driver: local
+  trivy-cache:
+    driver: local
+  sonarqube_data:
+    driver: local
+  sonarqube_extensions:
+    driver: local
+  sonarqube_logs:
+    driver: local
+  postgresql:
+    driver: local
+  postgresql_data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  uptime-kuma-data:
+    driver: local
+  uptimekuma-api-data:
+    driver: local
