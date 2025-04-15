@@ -31,8 +31,11 @@ services:
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
+    depends_on:
+      - traefik
     environment:
       - LOG_LEVEL=info
+      - HOMEPAGE_ALLOWED_HOSTS=homepage.${DOMAIN:-localhost}
     ports:
       - 3000:3000
     volumes:
@@ -183,9 +186,9 @@ services:
     image: louislam/uptime-kuma:1
     container_name: uptime-kuma
     volumes:
-        - "uptime-kuma-data:/app/data"
+      - "uptime-kuma-data:/app/data"
     ports:
-        - 3001:3001
+      - 3001:3001
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
