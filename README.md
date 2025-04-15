@@ -57,6 +57,10 @@ This boilerplate includes the following services:
 
 - **Homepage**: A simple, customizable homepage for your self-hosted services.
 
+### Development
+
+-- **Gitea**: An all-in-one software development service
+
 ### CI/CD
 
 - **Jenkins**: An automation server for building, testing, and deploying your code.
