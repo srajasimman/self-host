@@ -37,7 +37,7 @@ services:
       LOG_LEVEL: info
       HOMEPAGE_ALLOWED_HOSTS: homepage.${DOMAIN:-localhost}
     ports:
-      - 3000:3000
+      - "3000"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./homepage/app/config/:/app/config/"
@@ -144,6 +144,46 @@ services:
       - "homepage.icon=trivy.png"
       - "homepage.href=http://trivy.${DOMAIN:-localhost}/"
       - "homepage.description=Vulnerability Scanner"
+
+  gitea:
+    image: gitea/gitea
+    container_name: gitea
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - postgres
+    environment:
+      USER_UID: 1000
+      USER_GID: 1000
+      GITEA__database__DB_TYPE: postgres
+      GITEA__database__HOST: postgres:5432
+      GITEA__database__NAME: gitea
+      GITEA__database__USER: ${POSTGRES_USER:-postgres}
+      GITEA__database__PASSWD: ${POSTGRES_PASSWORD:-postgres}
+    restart: unless-stopped
+    volumes:
+      - ./gitea:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "3000"
+      - "22"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gitea.entrypoints=web"
+      - "traefik.http.routers.gitea.rule=Host(`gitea.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.gitea.loadbalancer.server.port=3000"
+      - "homepage.group=Development"
+      - "homepage.name=Gitea"
+      - "homepage.icon=gitea.png"
+      - "homepage.href=http://gitea.${DOMAIN:-localhost}/"
+      - "homepage.description=Gitea Self-hosted Git Service"
+      - "homepage.widget.type=gitea"
+      - "homepage.widget.url=http://gitea:3000"
+      - "homepage.widget.key=${GITEA_API_TOKEN:-}"
 
   sonarqube:
     image: sonarqube:community

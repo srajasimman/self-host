@@ -2,3 +2,5 @@ homepage/app/config/*
 !homepage/app/config/settings.yaml
 !homepage/app/config/docker.yaml
 !homepage/app/config/services.yaml
+
+gitea/**
