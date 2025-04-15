@@ -360,8 +360,6 @@ services:
 networks:
   default:
     driver: bridge
-  sonarqube:
-    driver: bridge
 
 volumes:
   jenkins-data:
