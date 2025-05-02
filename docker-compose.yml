@@ -70,6 +70,29 @@ services:
       - "homepage.href=http://jenkins.${DOMAIN:-localhost}/"
       - "homepage.description=Jenkins Continuous Integration Server"
 
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n
+    ports:
+      - "80"
+    volumes:
+      - "n8n_data:/home/node/.n8n"
+    restart: unless-stopped
+    environment:
+      N8N_SECURE_COOKIE: false
+      N8N_HOST: n8n.${DOMAIN:-localhost}
+      N8N_PORT: 80
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n.entrypoints=web"
+      - "traefik.http.routers.n8n.rule=Host(`n8n.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.n8n.loadbalancer.server.port=80"
+      - "homepage.group=Development"
+      - "homepage.name=n8n"
+      - "homepage.icon=n8n.png"
+      - "homepage.href=http://n8n.${DOMAIN:-localhost}/"
+      - "homepage.description=Workflow Automation Platform"
+
   minio:
     image: minio/minio
     container_name: minio
@@ -429,4 +452,6 @@ volumes:
   uptime-kuma-data:
     driver: local
   uptimekuma-api-data:
+    driver: local
+  n8n_data:
     driver: local
