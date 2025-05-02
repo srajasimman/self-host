@@ -59,7 +59,8 @@ This boilerplate includes the following services:
 
 ### Development
 
--- **Gitea**: An all-in-one software development service
+- **Gitea**: An all-in-one software development service
+- **n8n**: A powerful workflow automation platform that connects various services and applications
 
 ### CI/CD
 
