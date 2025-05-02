@@ -1,5 +1,14 @@
 name: self-host
 
+x-common-config: &common-config
+  restart: unless-stopped
+  environment:
+    TZ: ${TZ:-UTC}
+  healthcheck:
+    interval: 30s
+    timeout: 10s
+    retries: 3
+
 services:
   traefik:
     image: traefik
@@ -14,7 +23,6 @@ services:
       - "./traefik/config/conf/:/etc/traefik/conf/"
       - "./traefik/config/certs/:/etc/traefik/acme/"
     command: --providers.docker --log.level=DEBUG
-    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.traefik.entrypoints=web"
@@ -31,6 +39,7 @@ services:
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
+    <<: *common-config
     depends_on:
       - traefik
     environment:
@@ -41,7 +50,6 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./homepage/app/config/:/app/config/"
-    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.homepage.entrypoints=web"
@@ -51,12 +59,12 @@ services:
   jenkins:
     image: jenkins/jenkins:lts
     container_name: jenkins
+    <<: *common-config
     ports:
       - "8080"
       - "50000:50000"
     volumes:
       - "jenkins-data:/var/jenkins_home"
-    restart: unless-stopped
     environment:
       JAVA_OPTS: -Djenkins.install.runSetupWizard=true
     labels:
@@ -73,11 +81,11 @@ services:
   n8n:
     image: docker.n8n.io/n8nio/n8n
     container_name: n8n
+    <<: *common-config
     ports:
       - "80"
     volumes:
       - "n8n_data:/home/node/.n8n"
-    restart: unless-stopped
     environment:
       N8N_SECURE_COOKIE: false
       N8N_HOST: n8n.${DOMAIN:-localhost}
@@ -96,12 +104,12 @@ services:
   minio:
     image: minio/minio
     container_name: minio
+    <<: *common-config
     ports:
       - "9000"
       - "9001:9001"
     volumes:
       - "minio-data:/data"
-    restart: unless-stopped
     command: server /data --console-address "0.0.0.0:9001"
     environment:
       MINIO_DOMAIN: http://minio.${DOMAIN:-localhost}
@@ -121,12 +129,12 @@ services:
   registry:
     image: registry:2
     container_name: registry
+    <<: *common-config
     ports:
       - "5000"
     volumes:
       - "registry-data:/var/lib/registry"
       - "./registry/auth/htpasswd:/auth/htpasswd:ro"
-    restart: unless-stopped
     environment:
       REGISTRY_HTTP_ADDR: 0.0.0.0:5000
       REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
@@ -147,13 +155,13 @@ services:
   trivy:
     image: aquasec/trivy
     container_name: trivy
+    <<: *common-config
     ports:
       - "4594"
     volumes:
       - "trivy-data:/etc/trivy"
       - "trivy-cache:/root/.cache"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-    restart: unless-stopped
     command: server --listen :4954
     environment:
       TRIVY_LOG: DEBUG
@@ -171,6 +179,7 @@ services:
   gitea:
     image: gitea/gitea
     container_name: gitea
+    <<: *common-config
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s
@@ -186,7 +195,6 @@ services:
       GITEA__database__NAME: gitea
       GITEA__database__USER: ${POSTGRES_USER:-postgres}
       GITEA__database__PASSWD: ${POSTGRES_PASSWORD:-postgres}
-    restart: unless-stopped
     volumes:
       - ./gitea:/data
       - /etc/timezone:/etc/timezone:ro
@@ -211,6 +219,7 @@ services:
   sonarqube:
     image: sonarqube:community
     container_name: sonarqube
+    <<: *common-config
     depends_on:
       - postgres
     environment:
@@ -223,7 +232,6 @@ services:
       - sonarqube_logs:/opt/sonarqube/logs
     ports:
       - "9000"
-    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.sonarqube.entrypoints=web"
@@ -238,21 +246,23 @@ services:
   postgres:
     image: postgres:12
     container_name: postgres
+    <<: *common-config
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - postgresql:/var/lib/postgresql
       - postgresql_data:/var/lib/postgresql/data
+      - ./init-user-db.sh:/docker-entrypoint-initdb.d/init-user-db.sh
 
   uptime-kuma:
     image: louislam/uptime-kuma:1
     container_name: uptime-kuma
+    <<: *common-config
     volumes:
       - "uptime-kuma-data:/app/data"
     ports:
       - 3001:3001
-    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.uptime-kuma.entrypoints=web"
@@ -270,11 +280,11 @@ services:
   uptimekuma-api:
     image: medaziz11/uptimekuma_restapi
     container_name: uptimekuma-api
+    <<: *common-config
     volumes:
       - uptimekuma-api-data:/db
     ports:
       - 8000:8000
-    restart: unless-stopped
     environment:
       KUMA_SERVER: http://uptime-kuma:3001
       KUMA_USERNAME: admin
@@ -296,10 +306,10 @@ services:
   mailhog:
     image: mailhog/mailhog
     container_name: mailhog
+    <<: *common-config
     ports:
       - "1025"
       - "8025"
-    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.mailhog.entrypoints=web"
@@ -314,13 +324,13 @@ services:
   prometheus:
     image: prom/prometheus
     container_name: prometheus
+    <<: *common-config
     ports:
       - "9090"
     volumes:
       - "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
       - "prometheus-data:/prometheus"
     command: --config.file /etc/prometheus/prometheus.yml
-    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.prometheus.entrypoints=web"
@@ -337,12 +347,12 @@ services:
   alertmanager:
     image: prom/alertmanager
     container_name: alertmanager
+    <<: *common-config
     ports:
       - "9093"
     volumes:
       - "./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro"
     command: --config.file /etc/alertmanager/alertmanager.yml
-    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.alertmanager.entrypoints=web"
@@ -357,6 +367,7 @@ services:
   grafana:
     image: grafana/grafana
     container_name: grafana
+    <<: *common-config
     depends_on:
       - prometheus
     ports:
@@ -369,7 +380,6 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
-    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.grafana.entrypoints=web"
@@ -388,6 +398,7 @@ services:
   cadvisor:
     image: gcr.io/cadvisor/cadvisor
     container_name: cadvisor
+    <<: *common-config
     ports:
       - "8080"
     volumes:
@@ -396,11 +407,11 @@ services:
       - "/sys:/sys:ro"
       - "/var/lib/docker/:/var/lib/docker:ro"
       - "/dev/disk/:/dev/disk:ro"
-    restart: unless-stopped
 
   node_exporter:
     image: prom/node-exporter
     container_name: node_exporter
+    <<: *common-config
     ports:
       - "9100"
     volumes:
@@ -411,14 +422,13 @@ services:
       - "--path.procfs=/host/proc"
       - "--path.sysfs=/host/sys"
       - "--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($|/)"
-    restart: unless-stopped
 
   blackbox_exporter:
     image: prom/blackbox-exporter
     container_name: blackbox_exporter
+    <<: *common-config
     ports:
       - "9115"
-    restart: unless-stopped
 
 networks:
   default:
